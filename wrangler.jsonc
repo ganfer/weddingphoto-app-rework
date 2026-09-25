@@ -1,0 +1,19 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "weddingphoto-app-rework",
+  "main": "src/index.js",
+  "compatibility_date": "2026-09-25",
+  "workers_dev": true,
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application"
+  },
+  "images": {
+    "binding": "IMAGES"
+  },
+  "vars": {
+    "APP_NAME": "Wedding Photo Gallery",
+    "PCLOUD_API_BASE": "https://eapi.pcloud.com"
+  }
+}
