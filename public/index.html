@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex,nofollow,noarchive">
+  <meta name="theme-color" content="#f8f5f0">
+  <title>Wedding Photo Gallery</title>
+  <link rel="stylesheet" href="/styles.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <main class="shell">
+    <header class="hero">
+      <div class="eyebrow">Gemeinsame Erinnerungen</div>
+      <h1 id="appTitle">Wedding Photo Gallery</h1>
+      <p class="intro">Teilt eure schönsten Momente. Bilder lassen sich direkt hier ansehen und im Original herunterladen.</p>
+    </header>
+
+    <section id="loginPanel" class="panel login-panel" hidden>
+      <form id="loginForm">
+        <label for="password">Galerie-Passwort</label>
+        <div class="login-row">
+          <input id="password" name="password" type="password" autocomplete="current-password" required>
+          <button type="submit">Galerie öffnen</button>
+        </div>
+        <p id="loginError" class="status" role="status"></p>
+      </form>
+    </section>
+
+    <section id="galleryPanel" hidden>
+      <div class="toolbar panel">
+        <div>
+          <h2>Galerie <span id="photoCount" class="count">0</span></h2>
+          <p id="status" class="status" role="status"></p>
+        </div>
+        <div class="toolbar-actions">
+          <button id="logoutButton" class="button-quiet" type="button">Abmelden</button>
+          <button id="uploadButton" type="button">Bilder hochladen</button>
+        </div>
+      </div>
+      <form id="uploadForm" class="upload panel" hidden>
+        <label id="dropZone" class="drop-zone" for="fileInput">
+          <span class="upload-icon" aria-hidden="true">＋</span>
+          <strong>Bilder hier ablegen oder auswählen</strong>
+          <span>JPG, PNG, GIF, WebP, HEIC und AVIF</span>
+        </label>
+        <input id="fileInput" type="file" name="files[]" accept="image/jpeg,image/png,image/gif,image/webp,image/heic,image/heif,image/avif,.heic,.heif,.avif" multiple hidden>
+        <div class="upload-footer">
+          <span id="selectedFiles" class="muted">Keine Dateien ausgewählt</span>
+          <button id="submitUpload" type="submit" disabled>Hochladen</button>
+        </div>
+      </form>
+      <div id="emptyState" class="empty panel" hidden>Noch keine Bilder in dieser Galerie.</div>
+      <div id="gallery" class="gallery" aria-live="polite"></div>
+    </section>
+  </main>
+
+  <div id="lightbox" class="lightbox" hidden role="dialog" aria-modal="true" aria-label="Bildansicht">
+    <button id="lightboxClose" class="lightbox-close" type="button" aria-label="Schließen">×</button>
+    <button id="lightboxPrev" class="lightbox-nav previous" type="button" aria-label="Vorheriges Bild">‹</button>
+    <figure>
+      <img id="lightboxImage" alt="">
+      <figcaption>
+        <span id="lightboxName"></span>
+        <a id="downloadOriginal" href="#">Original herunterladen</a>
+      </figcaption>
+    </figure>
+    <button id="lightboxNext" class="lightbox-nav next" type="button" aria-label="Nächstes Bild">›</button>
+  </div>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+</body>
+</html>
