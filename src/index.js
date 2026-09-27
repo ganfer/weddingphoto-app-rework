@@ -49,7 +49,7 @@ export default {
         if (url.pathname === "/api/gallery" && request.method === "GET") return await listGallery(env);
         if (url.pathname === "/api/upload" && request.method === "POST") return await uploadImages(request, env);
         const imageMatch = url.pathname.match(/^\/api\/images\/(\d+)$/);
-        if (imageMatch && request.method === "GET") return await serveImage(imageMatch[1], url.searchParams.get("size") || "thumb", env);
+        if (imageMatch && request.method === "GET") return await serveImage(imageMatch[1], url.searchParams.get("size") || "thumb", env, request, ctx);
         const deleteMatch = url.pathname.match(/^\/api\/images\/(\d+)$/);
         if (deleteMatch && request.method === "DELETE") {
           if (session.role !== "admin") return json({ error: "Nur der Admin kann Bilder löschen." }, 403);
@@ -211,12 +211,26 @@ async function pcloudFileLink(method, params, env) {
   return { url: `https://${host}${data.path}`, size: data.size };
 }
 
-async function serveImage(id, size, env) {
+async function serveImage(id, size, env, request, ctx) {
   if (!/^[0-9]{1,20}$/.test(id)) return json({ error: "Ungültige Bild-ID." }, 400);
   const variant = size === "original" ? "original" : size === "display" ? "display" : "thumb";
   const metadataResult = await pcloudJson("stat", { fileid: id }, env);
   const metadata = metadataResult.metadata;
   if (!metadata || !isImage(metadata)) return json({ error: "Bild nicht gefunden." }, 404);
+
+  const cacheKeyUrl = new URL(request.url);
+  cacheKeyUrl.search = "?size=display";
+  const displayCacheKey = new Request(cacheKeyUrl.toString(), { method: "GET" });
+  if (variant === "display") {
+    const cached = await caches.default.match(displayCacheKey);
+    if (cached) {
+      const headers = new Headers(cached.headers);
+      headers.set("Cache-Control", "private, max-age=3600");
+      headers.set("Vary", "Cookie");
+      return new Response(cached.body, { status: cached.status, statusText: cached.statusText, headers });
+    }
+  }
+
   let link;
   let isThumbnail = false;
   let type = metadata.contenttype || "image/jpeg";
@@ -230,18 +244,22 @@ async function serveImage(id, size, env) {
       console.warn("pCloud thumbnail unavailable; using original", error instanceof Error ? error.message : "unknown error");
     }
   }
+  if (variant === "display" && !link) {
+    return json({ error: "Für dieses Bild ist keine Großansicht verfügbar." }, 503);
+  }
   if (!link) link = await pcloudFileLink("getfilelink", { fileid: id }, env);
   const upstream = await fetch(link.url);
   if (!upstream.ok || !upstream.body) throw new Error(`pCloud Bildantwort HTTP ${upstream.status}.`);
   if (variant !== "original" && env.IMAGES && (isThumbnail || Number(metadata.size || 0) <= 20 * 1024 * 1024)) {
     try {
-      return (await env.IMAGES.input(upstream.body)
+      const optimized = (await env.IMAGES.input(upstream.body)
         .transform({ width: variant === "display" ? 1600 : 400, height: variant === "display" ? 1000 : 400, fit: "scale-down" })
         .output({ format: "image/webp", quality: 78, anim: true }))
         .response({ headers: { "Cache-Control": "private, max-age=3600", "Vary": "Cookie" } });
+      return variant === "display" ? cacheDisplayImage(optimized, displayCacheKey, ctx) : optimized;
     } catch (error) {
       console.warn("Cloudflare image optimization fallback", error instanceof Error ? error.message : "unknown error");
-      // Return the pCloud-generated JPEG thumbnail (or the original) if optimization is unavailable.
+      // Return the pCloud-generated JPEG thumbnail if optimization is unavailable.
     }
   }
   const headers = new Headers({
@@ -251,7 +269,29 @@ async function serveImage(id, size, env) {
     "X-Content-Type-Options": "nosniff"
   });
   if (variant === "original") headers.set("Content-Disposition", `attachment; filename*=UTF-8''${encodeURIComponent(metadata.name || `photo-${id}`)}`);
-  return new Response(upstream.body, { headers });
+  const fallback = new Response(upstream.body, { headers });
+  return variant === "display" ? cacheDisplayImage(fallback, displayCacheKey, ctx) : fallback;
+}
+
+function cacheDisplayImage(response, cacheKey, ctx) {
+  const cachedHeaders = new Headers(response.headers);
+  cachedHeaders.set("Cache-Control", "public, max-age=300");
+  cachedHeaders.delete("Vary");
+  const cacheCopy = new Response(response.clone().body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers: cachedHeaders
+  });
+  ctx.waitUntil(caches.default.put(cacheKey, cacheCopy));
+
+  const clientHeaders = new Headers(response.headers);
+  clientHeaders.set("Cache-Control", "private, max-age=3600");
+  clientHeaders.set("Vary", "Cookie");
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers: clientHeaders
+  });
 }
 
 async function deleteImage(id, env) {
