@@ -166,12 +166,27 @@ function openLightbox(index) {
 function renderLightbox() {
   const image = images[activeIndex];
   if (!image) return closeLightbox();
-  $("#lightboxImage").src = `/api/images/${encodeURIComponent(image.id)}?size=display`;
-  $("#lightboxImage").alt = image.name;
+
+  const lightboxImage = $("#lightboxImage");
+  const thumbnailUrl = `/api/images/${encodeURIComponent(image.id)}?size=thumb`;
+  const displayUrl = `/api/images/${encodeURIComponent(image.id)}?size=display`;
+  lightboxImage.alt = image.name;
+  lightboxImage.src = thumbnailUrl;
+  lightboxImage.dataset.displaySrc = displayUrl;
   $("#lightboxName").textContent = image.name;
   $("#downloadOriginal").href = `/api/images/${encodeURIComponent(image.id)}?size=original`;
+
+  const fullPreview = new Image();
+  fullPreview.decoding = "async";
+  fullPreview.onload = () => {
+    if (lightboxImage.dataset.displaySrc === displayUrl) lightboxImage.src = displayUrl;
+  };
+  fullPreview.onerror = () => {
+    if (lightboxImage.dataset.displaySrc === displayUrl) showToast("Die Großansicht konnte nicht geladen werden.");
+  };
+  fullPreview.src = displayUrl;
 }
-function closeLightbox() { lightbox.hidden = true; $("#lightboxImage").removeAttribute("src"); }
+function closeLightbox() { lightbox.hidden = true; $("#lightboxImage").removeAttribute("src"); delete $("#lightboxImage").dataset.displaySrc; }
 function showNext(direction) { activeIndex = (activeIndex + direction + images.length) % images.length; renderLightbox(); }
 $("#lightboxClose").addEventListener("click", closeLightbox);
 $("#lightboxPrev").addEventListener("click", () => showNext(-1));
